@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!-- Arguments -->
+    <!-- <arg name="map_file" default="$(find tdk_navigation)/maps/A_field_2.yaml" /> -->
+    <!-- <arg name="waypoint_file" default="$(find tdk_launch)/params/waypoints_A.yaml" /> -->
+    <!-- <arg name="map_file" default="$(find tdk_navigation)/maps/B_field_4.yaml" /> -->    
+    <!-- <arg name="waypoint_file" default="$(find tdk_launch)/params/waypoints_test.yaml" /> -->
+    <arg name="map_file" default="$(find tdk_navigation)/maps/B_field_4.yaml" />    
+    <arg name="waypoint_file" default="$(find tdk_launch)/params/waypoints_test.yaml" />
+
+    <!-- Start RVIZ -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find tdk_launch)/rviz/map.rviz" />
+
+    <!-- Start Map Server -->
+    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)" />
+
+    <!-- Start Waypoints Publisher -->
+    <node pkg="tdk_launch" name="waypoints_publisher" type="waypoints_publisher.py" output="screen">
+        <param name="waypoint_file" type="string" value="$(arg waypoint_file)" />
+    </node>
+
+</launch>

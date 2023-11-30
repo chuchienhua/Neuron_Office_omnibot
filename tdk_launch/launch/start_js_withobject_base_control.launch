@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<launch>
+
+
+    <!-- Start Lidars <param name="connect_timeout" value="10.0"/> --> 
+	<node pkg="tf" type="static_transform_publisher" name="laser_tf_broadcaster" args="0 0 0 0 0 0 base_link laser 100" />
+	<node pkg="urg_node" type="urg_node" name="urg_node">
+	    <param name="ip_address" value="192.168.0.100"/>
+		<param name="frame_id" value="laser"/>
+		<param name="min_ang" value="-2.356194"/>
+		<param name="max_ang" value="2.356194"/>
+	</node>
+    <!-- Open detect object-->
+	<node name="obstacle_detection_node" pkg="your_package_name" type="obstacle_marker" output="screen">
+    	<param name="scan_topic" value="/scan" />
+  	</node>
+    <!-- Open Camera and view and Save-->
+    <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen">
+        <param name="video_device" value="/dev/video0" />
+        <param name="image_width" value="640" />
+        <param name="image_height" value="480" />
+        <param name="pixel_format" value="yuyv" />
+        <param name="color_format" value="yuv422p" />
+        <param name="camera_frame_id" value="usb_cam" />
+        <param name="io_method" value="mmap" />
+    </node>
+    <!-- <node name="image_view" pkg="image_view" type="image_view" respawn="false" output="screen">
+        <remap from="image" to="/usb_cam/image_raw" />
+        <param name="autosize" value="true" />
+    </node> -->
+    <node name="camera_capture_node" pkg="camera_capture_node" type="camera_capture_node" output="screen" />
+    <!-- <node name="my_tf_listener" pkg="my_tf_listener_pkg" type="my_tf_listener" output="screen" />       -->
+
+    <!-- Base Controller -->
+    <node pkg="tdk_base_controller" type="tdk_base_controller_node" name="tdk_base_controller" output="screen">        
+        <param name="device_port" value="/dev/ttyACM0" />        
+    </node>
+    
+    <!-- Joystick Control -->
+    <node pkg="tdk_js_control" type="tdk_js_control_node" name="tdk_js_control" output="screen">        
+        <param name="vx_sacler" value="0.5" /> 
+        <param name="vy_sacler" value="0.5" />
+        <param name="w_sacler" value="3.14" />
+    </node>
+    <!-- Joystick -->
+    <node pkg="joy" type="joy_node" name="joystick" output="screen">        
+        <param name="dev" value="/dev/input/js0" />        
+    </node>          
+
+    
+</launch>

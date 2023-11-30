@@ -1,0 +1,5 @@
+<launch>
+  <node name="obstacle_detection_node" pkg="your_package_name" type="obstacle_marker" output="screen">
+    <param name="scan_topic" value="/scan" />
+  </node>
+</launch>

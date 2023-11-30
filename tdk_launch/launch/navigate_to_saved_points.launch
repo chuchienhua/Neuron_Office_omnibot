@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="visualize" default="true" />
+    <arg name="saved_points" default="$(find ccp_js_node)/saved_points/1103.csv" />
+
+    <!-- Base Controller -->
+    <include file="$(find omni_base_driver)/launch/omni_base_kb_driver.launch" />
+
+    <!-- Navigation -->
+    <include file="$(find tdk_navigation)/launch/tdk_navigation.launch">
+        <arg name="open_rviz" value="$(arg visualize)" />
+        <!-- <arg name="map_file" value="$(find tdk_navigation)/maps/0421.yaml" /> -->
+        <!-- <arg name="map_file" value="$(find tdk_navigation)/maps/0508ob.yaml" /> -->
+    </include>
+    
+
+    <!-- Demo -->
+    <node pkg="tdk_launch" name="nav_to_saved_points" type="nav_to_saved_points.py" output="screen">
+        <param name="saved_points_file" value="$(arg saved_points)" />                
+    </node>
+
+</launch>

@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!-- Start Lidars-->
+    <node pkg="tf" type="static_transform_publisher" name="laser_tf_broadcaster" args="0 0 0 0 0 0 base_link laser 100" /> 
+	<node pkg="urg_node" type="urg_node" name="urg_node">
+	    <param name="ip_address" value="192.168.0.100"/>
+		<param name="frame_id" value="laser"/>
+		<param name="min_ang" value="-2.356194"/>
+		<param name="max_ang" value="2.356194"/>
+		<param name="connect_timeout" value="10.0"/>
+	</node>
+
+
+    <!-- TDK Base Controller -->
+    <node pkg="tdk_base_controller" type="tdk_base_controller_node" name="tdk_base_controller" output="screen">        
+        <param name="device_port" value="/dev/ttyACM0" />        
+    </node>
+
+    
+    <!-- TDK Joystick Control -->
+    <node pkg="tdk_js_control" type="tdk_js_control_node" name="tdk_js_control" output="screen">        
+        <param name="vx_sacler" value="0.5" /> 
+        <param name="vy_sacler" value="0.5" />
+        <param name="w_sacler" value="3.14" />
+    </node>
+
+    <!-- Joystick -->
+    <node pkg="joy" type="joy_node" name="joystick" output="screen">        
+        <param name="dev" value="/dev/input/js0" />        
+    </node>
+
+            
+</launch>

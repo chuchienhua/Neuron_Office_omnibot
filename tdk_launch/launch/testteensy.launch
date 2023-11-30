@@ -1,0 +1,8 @@
+<launch>
+ 
+	<!--start teensy communication-->
+	<node pkg="teensycommunucation" name="teensycommunucation" type="teensycommunucation_node" output="screen" >
+		<param name="port" value="/dev/teensy4" />
+	</node>
+
+</launch>
