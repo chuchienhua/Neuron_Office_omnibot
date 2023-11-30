@@ -1,0 +1,39 @@
+TrajectoryPlannerROS:
+
+# Robot Configuration Parameters
+  max_vel_x: 0.6
+  min_vel_x: 0.15
+  
+  max_vel_theta:  0.6
+  min_vel_theta: -0.5
+  min_in_place_vel_theta: 0.2
+
+  acc_lim_x: 0.3
+  acc_lim_y: 0.5
+  acc_lim_theta: 0.5
+  y_vel: [-0.6, -0.24, 0.24 ,0.6]
+
+# Goal Tolerance Parameters
+  xy_goal_tolerance: 0.20
+  yaw_goal_tolerance: 0.10
+  latch_xy_goal_tolerance: false
+
+  escape_vel: -0.2
+
+# Omni-drive robot configuration
+  holonomic_robot: true
+
+# Forward Simulation Parameters
+  sim_time: 1.5 #0.8
+  vx_samples: 10 #18
+  vtheta_samples: 25 #20
+  sim_granularity: 0.025
+
+
+#Parameters for scoring trajectories
+meter_scoring: true # true: unit is meter, false: cell
+pdist_scale: 1.0 # max is 5
+gdist_scale: 1.0 # max is 5
+heading_scoring: false
+heading_lookahead: 0.3 # meter
+heading_scoring_timestep: 0.5 # secs

@@ -1,0 +1,22 @@
+global_costmap:
+  robot_radius: 0.18
+  footprint_padding: 0.02
+  global_frame: map
+  robot_base_frame: base_link
+
+  update_frequency: 10 #4 #1 #10.0
+  publish_frequency: 10 #0.5 #10.0
+  transform_tolerance: 1.0 #5.0
+
+  static_map: true
+
+  width: 30
+  height: 30 
+  resolution: 0.075
+  rolling_window: false
+  # track_unknow_spce: true
+
+  
+  inflation_radius: 0.1 #0.1
+  cost_scaling_factor: 3 #4
+ 

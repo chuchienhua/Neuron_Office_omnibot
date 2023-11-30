@@ -1,0 +1,37 @@
+<launch>
+	<!-- Arguments -->
+	<arg name="map_file" value="$(find tdk_navigation)/maps/110201.yaml" />
+	<!-- <arg name="map_file" default="$(find tdk_navigation)/maps/0508ob.yaml" /> -->
+	<arg name="open_rviz" default="true" />
+	<arg name="move_forward_only" default="false" />
+
+	<!-- Map server -->
+	<node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)" />
+
+	<!-- AMCL -->
+	<include file="$(find tdk_navigation)/launch/amcl.launch" />
+
+	<!-- move_base -->
+	<!-- <include file="$(find tdk_navigation)/launch/move_base.launch">
+		<arg name="move_forward_only" value="$(arg move_forward_only)" />
+	</include> -->
+	<include file="$(find tdk_navigation)/launch/move_base_teb.launch">
+		<arg name="move_forward_only" value="$(arg move_forward_only)" />
+	</include>   
+
+	<!--start teensy communication-->
+	<node pkg="teensycommunucation" name="teensycommunucation" type="teensycommunucation_node" output="screen" >
+		<param name="port" value="/dev/teensy4" />
+	</node>       
+
+	<!-- rviz -->
+	<group if="$(arg open_rviz)">
+		<node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find tdk_navigation)/rviz/tdk_navigation.rviz" />
+	</group>
+
+	<!-- Map match ratio -->
+	<node pkg="sensor_map_compare" name="compare_sensor_map" type="compare_sensor_map.py" output="screen" />   
+
+
+
+</launch>
