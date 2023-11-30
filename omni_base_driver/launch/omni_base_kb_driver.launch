@@ -1,0 +1,34 @@
+<launch>
+	
+	<include file="$(find omni_base_driver)/launch/omni_base_driver.launch">
+		<arg name="cmd_vel_arg"  	value="omni_base_driver/cmd_vel"/>
+	    <arg name="odom_topic_arg"  value="odom"/>
+		<arg name="odom_id_arg"   	value="odom" />
+	    <arg name="imu_topic_arg"	value="imu" />
+	  	<arg name="enable_tf_arg"  	value="true" />
+		<arg name="vel_timeout_arg" value="3" />
+	</include>
+
+	<include file="$(find tdk_launch)/launch/start_two_lasers.launch" />
+
+	<!-- <node pkg="tf" type="static_transform_publisher" name="lase_to_base" args="0.1 0.0 0.4 0.0 0.0 0.0 base_link base_laser 100" /> -->
+	<!-- <node pkg="urg_node" type="urg_node" name="urg_node"> -->
+		<!-- <param name="ip_address" value="192.168.0.100"/> -->
+		<!-- <param name="frame_id" value="base_laser"/> -->
+		<!-- <param name="min_ang" value="-2.356194"/> -->
+		<!-- <param name="max_ang" value="2.356194"/> -->
+		<!-- <param name="connect_timeout" value="10.0"/></node> -->
+ 
+	<!-- <node name="keyboard_driver" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" output="screen"/> -->
+
+	<node name="ccp_js_node" pkg="ccp_js_node" type="ccp_js_node" output="screen">
+		<param name="vx_sacler" value="0.5" />
+		<param name="vy_sacler" value="0.5" />
+		<param name="w_sacler" value="0.314" /> <!-- 3.14-->
+	</node>
+
+	<node pkg="joy" type="joy_node" name="joystick" output="screen">
+		<!-- <param name="dev" value="dev/input/js1" /> -->
+	</node>
+  
+</launch>

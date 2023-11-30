@@ -1,0 +1,32 @@
+<launch>
+
+	<!-- <arg name="imu_frame" value="base_imu"/> -->
+
+	<include file="$(find omni_base_driver)/launch/omni_base_driver.launch">
+    	<arg name="cmd_vel_arg"  	value="cmd_vel"/>
+	    <arg name="odom_topic_arg"  value="odom"/>
+		<arg name="odom_id_arg"   	value="odom" />
+	    <arg name="imu_topic_arg"	value="imu" />
+	  	<arg name="enable_tf_arg"  	value="true" />
+		<arg name="vel_timeout_arg" value="1" />
+	</include>
+
+ 	<include file="$(find omni_base_driver)/launch/omni_laser.launch"/>
+ 
+	<node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true" output="screen">
+            <rosparam command="load" file="$(find omni_base_driver)/param/omni_imu_ekf_params.yaml" />
+			<remap from="/odometry/filtered" to="/odom" />
+	</node>
+
+	<node name="ccp_js_node" pkg="ccp_js_node" type="ccp_js_node" output="screen">
+		<param name="vx_sacler" value="0.5" />
+		<param name="vy_sacler" value="0.5" />
+		<param name="w_sacler" value="3.14 / 2" />
+	</node>
+
+	<node pkg="joy" type="joy_node" name="joystick" output="screen">
+		<!-- <param name="dev" value="dev/input/js1" /> -->
+	</node>
+
+  
+</launch>
