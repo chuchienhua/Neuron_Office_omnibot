@@ -5,9 +5,9 @@ const WebSocket = require('ws');
 const cors = require('cors');
 
 const app = express();
-const wsUrl = 'ws://192.168.103.83:9090';
+const wsUrl = 'ws://192.168.103.122:9090';
 const port = 3000;
-const sendInterval = 1000; // 1 second
+const sendInterval = 500; // 0.5 second
 const reconnectInterval = 3000; // 重新連接的間隔（毫秒）
 const bodyParser = require('body-parser');
 app.use(cors()); // 这里添加CORS中间件
@@ -19,6 +19,8 @@ let currentPose = null;
 let navigationStatus;
 let joystickStatus = false;
 let map_match_ratio;
+let sendcar_status;
+let connect_bool = false;
 let receivedDatastruct = {
     relocation_initpose_value: null,
     relocation_initpose_bool: false,
@@ -82,23 +84,32 @@ rosnodejs.initNode('/my_ros_node')
             ws.on('open', function open() {
                 console.log('Connected to WebSocket server');
                 ws.send(JSON.stringify({ clientId: 0x01 })); // agv1 = 0x01
-                // 定期發送資訊
-                setInterval(() => {
-                    ws.send(JSON.stringify({
-                        connect: 'Success Connected to the server.',
-                        navigationStatus: navigationStatus,
-                        joystickStatus: joystickStatus,
-                        currentPose: currentPose,
-                        map_match_ratio: map_match_ratio,
-                    }));
-                }, sendInterval);
             });
-
             ws.on('message', function incoming(message) {
                 try {
                     const receivedData = JSON.parse(message);
                     receivedDatastruct = receivedData;
-                    console.log('Received Server Data:', receivedDatastruct);
+                    // console.log('Received Server Data:', receivedData.connect_bool);
+                    if (receivedData.connect_bool !== undefined) {
+                        connect_bool = receivedData.connect_bool;
+                        // 定期發送資訊
+                        if (connect_bool && !sendcar_status) {
+                            // 如果 connect_bool 为 true 并且定时器尚未启动，则启动定时器
+                            sendcar_status = setInterval(() => {
+                                ws.send(JSON.stringify({
+                                    connect: 'Success Connected to the server.',
+                                    navigationStatus: navigationStatus,
+                                    joystickStatus: joystickStatus,
+                                    currentPose: currentPose,
+                                    map_match_ratio: map_match_ratio,
+                                }));
+                            }, sendInterval);
+                        } else if (!connect_bool && sendcar_status) {
+                            // 如果 connect_bool 为 false 并且定时器已经启动，则停止定时器
+                            clearInterval(sendcar_status);
+                            sendcar_status = null;
+                        }
+                    }
                     // 進一步處理receivedData
 
                     //Relocation publish to ROS//
@@ -173,8 +184,8 @@ rosnodejs.initNode('/my_ros_node')
                     // check heartbeat
                     if (receivedData.heartbeat === 0XAA) {
                         console.log('Heartbeat received from server');
-                        // 发送心跳响应
-                        ws.send(JSON.stringify({ heartbeat: 0XAB }));
+                        // response heartbeat
+                        // ws.send(JSON.stringify({ heartbeat: 0XAB }));
                     }
                 } catch (error) {
                     console.log('Error parsing JSON:', error);
