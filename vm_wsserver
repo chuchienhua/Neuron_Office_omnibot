@@ -1,17 +1,16 @@
 const express = require("express");
 const rosnodejs = require("rosnodejs");
 const http = require("http");
+const bodyParser = require('body-parser');
 const WebSocket = require("ws");
 const cors = require("cors");
 
 const app = express();
 const port = 9090;
-
+const HEARTBEAT_INTERVAL = 20000; // heartbeat 20s
 app.use(cors());
 app.use(express.json());
-const HEARTBEAT_INTERVAL = 20000;
-
-let navigationStatus, joystickStatus, currentPose, map_match_ratio;
+app.use(bodyParser.json());
 let relocation_initpose_bool, path_cancel_bool, go_home_bool, multiple_points_bool;
 
 // 創建一個HTTP服務器並將Express應用掛載上去
@@ -25,10 +24,11 @@ const clientDataMap = new Map(); // 存储客户端ID与其状态的映射
 wss.on("connection", function connection(ws) {
   console.log('Agv client connected via WebSocket.');
   let clientId = null;
+
   //setting heartbeat 30s / one time
   const heartbeat = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ heartbeat:0xAA }));
+      ws.send(JSON.stringify({ heartbeat: 0xAA }));
     }
   }, HEARTBEAT_INTERVAL);
 
@@ -49,14 +49,14 @@ wss.on("connection", function connection(ws) {
           currentPose: receivedData.currentPose,
           map_match_ratio: receivedData.map_match_ratio
         });
-        // console.log(clientId + "Client data updated:", JSON.stringify(clientDataMap.get(clientId)));
+        console.log(clientId + "Client data updated:", JSON.stringify(clientDataMap.get(clientId)));
       }
       else {
         console.log("Warning: Received message without clientId.");
       }
-      if (receivedData.heartbeat === 0XAB) {
-        console.log("Heartbeat received from client");
-      }
+      // if (receivedData.heartbeat === 0XAB) {
+      //   console.log("Heartbeat received from client");
+      // }
     } catch (error) {
       console.log("Error parsing JSON:", error);
     }
@@ -86,8 +86,20 @@ app.use((req, res, next) => {
 // API connect check / navigationStatus / joystickStatus
 app.post("/connect", (req, res) => {
   const targetClientId = req.body.carid;
+  const connect_bool = req.body.carconnect_bool;
   const clientData = clientDataMap.get(targetClientId);
-  if (clientData) {
+  const targetClient = clientMap.get(targetClientId);
+  console.log("Received connect value:", connect_bool);
+  wss.clients.forEach((client) => {
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      client.send(
+        JSON.stringify({
+          connect_bool: connect_bool,
+        })
+      );
+    }
+  });
+  if (clientData ) {
     res.status(200).send({
       connect: "Success Connected to the server.", //connect msg
       navigationStatus: clientData.navigationStatus, //navigation status
@@ -95,6 +107,27 @@ app.post("/connect", (req, res) => {
     });
   } else {
     res.status(404).send("No pose information available for client " + targetClientId);
+    connect_bool = false;
+  }
+});
+
+app.post("/disconnect", (req, res) => {
+  const targetClientId = req.body.carid;
+  const connect_bool = req.body.carconnect_bool;
+  const targetClient = clientMap.get(targetClientId);
+  wss.clients.forEach((client) => {
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      client.send(
+        JSON.stringify({
+          connect_bool: connect_bool,
+        })
+      );
+    }
+  });
+  if(req.body.carid && req.body.carconnect_bool){
+    res.status(200).send({
+      disconnect: "Success Disconnected to the server.", //disconnect msg
+    });
   }
 });
 
@@ -217,5 +250,5 @@ app.post("/go_home", express.json(), (req, res) => {
 
 // 使用HTTP服務器來監聽端口，而不是直接使用Express應用
 server.listen(port, () => {
-  console.log(`Server is running on http://192.168.103.83:${port}`);
+  console.log(`Server is running on port:${port}`);
 });
