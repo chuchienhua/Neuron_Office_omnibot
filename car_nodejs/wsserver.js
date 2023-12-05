@@ -20,6 +20,7 @@ let navigationStatus;
 let joystickStatus = false;
 let map_match_ratio;
 let sendcar_status;
+let go_home_msgs;
 let connect_bool = false;
 let receivedDatastruct = {
     relocation_initpose_value: null,
@@ -54,6 +55,16 @@ rosnodejs.initNode('/my_ros_node')
             map_match_ratio = msg.data;
         });
 
+        nh.subscribe('/move_base/result', 'move_base_msgs/MoveBaseActionResult', (msg) => {
+            go_home_msgs = msg.status.status;
+
+            if (go_home_msgs == 3) {
+                navigationStatus = '車子已到達原點';
+                receivedDatastruct.go_home_bool = false;
+            }
+
+        });
+
         // ---------------subscribe-------------------//
 
 
@@ -62,6 +73,7 @@ rosnodejs.initNode('/my_ros_node')
         const std_msgs = rosnodejs.require('std_msgs').msg;
         let initialize_Relocation_pub = nh.advertise('/initialize_Relocation', std_msgs.Int16);
         let stopnavigation_pub = nh.advertise("/stopnavigationSend", std_msgs.Int8);
+        let control_mode_pub = nh.advertise("/control_mode", std_msgs.Bool);
 
         const geometry_msgs = rosnodejs.require('geometry_msgs').msg;
         let goalPub = nh.advertise('/move_base_simple/goal', geometry_msgs.PoseStamped);
@@ -78,6 +90,7 @@ rosnodejs.initNode('/my_ros_node')
 
         //---------------------websocket----------------------//
 
+
         function connectWebSocket() {
             const ws = new WebSocket(wsUrl);
 
@@ -93,10 +106,11 @@ rosnodejs.initNode('/my_ros_node')
                     if (receivedData.connect_bool !== undefined) {
                         connect_bool = receivedData.connect_bool;
                         // 定期發送資訊
-                        if (connect_bool && !sendcar_status) {
+                        if (connect_bool) {
                             // 如果 connect_bool 为 true 并且定时器尚未启动，则启动定时器
                             sendcar_status = setInterval(() => {
                                 ws.send(JSON.stringify({
+                                    clientId: 0x01,
                                     connect: 'Success Connected to the server.',
                                     navigationStatus: navigationStatus,
                                     joystickStatus: joystickStatus,
@@ -104,7 +118,7 @@ rosnodejs.initNode('/my_ros_node')
                                     map_match_ratio: map_match_ratio,
                                 }));
                             }, sendInterval);
-                        } else if (!connect_bool && sendcar_status) {
+                        } else {
                             // 如果 connect_bool 为 false 并且定时器已经启动，则停止定时器
                             clearInterval(sendcar_status);
                             sendcar_status = null;
@@ -116,21 +130,35 @@ rosnodejs.initNode('/my_ros_node')
                     if (receivedDatastruct.relocation_initpose_bool) {
                         let msg = new std_msgs.Int16();
                         msg.data = receivedDatastruct.relocation_initpose_value;
-                        console.log(msg);
+                        console.log("Relocation" + msg);
                         initialize_Relocation_pub.publish(msg);
                         receivedDatastruct.relocation_initpose_bool = false;
                     }
 
                     //Path Cancel publish to ROS//
                     if (receivedDatastruct.path_cancel_bool == true) {
+                        navigationStatus = '已重新定位於地圖座標(0,0,0)';
                         let msg = new std_msgs.Int8();
                         msg.data = receivedDatastruct.path_cancel_value;
+                        console.log("path_cancel" + msg);
                         stopnavigation_pub.publish(msg);
                         receivedDatastruct.path_cancel_bool = false;
+                        
+                    }
+
+                    //Control Mode publish to ROS//
+                    if (receivedDatastruct.control_mode_bool == true) {
+                        let msg = new std_msgs.Bool();
+                        msg.data = receivedDatastruct.control_mode_value;
+                        console.log("control_mode" + msg);
+                        control_mode_pub.publish(msg);
+                        receivedDatastruct.control_mode_bool = false;
                     }
 
                     //Go Home publish to ROS//
                     if (receivedDatastruct.go_home_bool == true) {
+                        console.log("go_home");
+                        navigationStatus = '車子移動中,正在回原點';
                         // 新的PoseStamped消息
                         let goalMsg = new geometry_msgs.PoseStamped();
 
@@ -151,10 +179,11 @@ rosnodejs.initNode('/my_ros_node')
 
                         // 发布目标点
                         goalPub.publish(goalMsg);
-                        receivedDatastruct.go_home_bool = false;
+
                     }
                     //Multiple Goals publish to ROS//
                     if (receivedDatastruct.multiple_points_bool == true) {
+                        console.log("multiple_points");
                         let goals = [];
                         receivedDatastruct.multiple_points.forEach(point => {
                             let goalMsg = new geometry_msgs.Pose();
@@ -185,7 +214,9 @@ rosnodejs.initNode('/my_ros_node')
                     if (receivedData.heartbeat === 0XAA) {
                         console.log('Heartbeat received from server');
                         // response heartbeat
-                        // ws.send(JSON.stringify({ heartbeat: 0XAB }));
+                        if (!connect_bool) {
+                            ws.send(JSON.stringify({ heartbeat: 0XAB }));
+                        }
                     }
                 } catch (error) {
                     console.log('Error parsing JSON:', error);
@@ -202,6 +233,7 @@ rosnodejs.initNode('/my_ros_node')
                 ws.close(); // 確保在錯誤後關閉連接
             });
         }
+
 
         // 初始化連接
         connectWebSocket();
