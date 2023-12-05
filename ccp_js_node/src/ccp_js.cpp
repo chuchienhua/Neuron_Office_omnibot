@@ -30,6 +30,7 @@
 
 void joyStickCallback(const sensor_msgs::Joy::ConstPtr &msg);
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg);
+void contorlmodeCallback(const std_msgs::Bool::ConstPtr &msg);
 void amclPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg);
 void savedPosePubTimerCallback(const ros::TimerEvent &);
 void goHome();
@@ -70,6 +71,7 @@ int main(int argc, char **argv)
     ros::Subscriber joyStickSub = nh.subscribe("/joy", 1000, joyStickCallback);
     ros::Subscriber cmdVelSub = nh.subscribe("/cmd_vel", 1000, cmdVelCallback);
     ros::Subscriber amclPoseSub = nh.subscribe("/amcl_pose", 1000, amclPoseCallback);
+    ros::Subscriber controlModeSub = nh.subscribe("/control_mode", 1, contorlmodeCallback);
     cmdVelPub = nh.advertise<geometry_msgs::Twist>("omni_base_driver/cmd_vel", 1);
     joycontrolPub = nh.advertise<std_msgs::Bool>("/joy_enable", 1);
     emergencyStopPub = nh.advertise<std_msgs::Bool>("/emergency_stop", 1);
@@ -195,6 +197,23 @@ void joyStickCallback(const sensor_msgs::Joy::ConstPtr &msg)
 
     twistMsg.angular.z = msg->axes[W_AXIS] * w_sacler;
     cmdVelPub.publish(twistMsg);
+}
+
+void contorlmodeCallback(const std_msgs::Bool::ConstPtr &msg)
+{
+    std_msgs::Bool boolJoyMsg;
+    if(msg->data == true)
+    {
+        jsCmdVel = true;
+        boolJoyMsg.data = jsCmdVel;
+    }
+    else
+    {
+        jsCmdVel = false;
+        boolJoyMsg.data = jsCmdVel;
+    }
+    joycontrolPub.publish(boolJoyMsg);
+    ROS_INFO_STREAM("Joystick control = " << jsCmdVel);
 }
 
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
