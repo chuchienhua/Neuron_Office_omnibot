@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const cors = require('cors');
 
 const app = express();
-const wsUrl = 'ws://192.168.103.122:9090';
+const wsUrl = 'ws://192.168.103.123:9090';
 const port = 3000;
 const sendInterval = 500; // 0.5 second
 const reconnectInterval = 3000; // 重新連接的間隔（毫秒）
@@ -21,6 +21,7 @@ let joystickStatus = false;
 let map_match_ratio;
 let sendcar_status;
 let go_home_msgs;
+let Error_Disconnect_appear = false;
 let connect_bool = false;
 let receivedDatastruct = {
     relocation_initpose_value: null,
@@ -49,6 +50,15 @@ rosnodejs.initNode('/my_ros_node')
 
         nh.subscribe('/joy_enable', 'std_msgs/Bool', (msg) => {
             joystickStatus = msg.data;
+            if (joystickStatus == true) {
+                if (Error_Disconnect_appear == false) {
+                    navigationStatus = '手動模式切換成功';
+                } else {
+                    navigationStatus = '網頁連線中斷,AGV已停止,請校正回自動模式,任務才會繼續';
+                }
+            } else {
+                navigationStatus = '自動模式切換成功';
+            }
         });
 
         nh.subscribe('/map_match_ratio', 'std_msgs/Float32', (msg) => {
@@ -90,7 +100,6 @@ rosnodejs.initNode('/my_ros_node')
 
         //---------------------websocket----------------------//
 
-
         function connectWebSocket() {
             const ws = new WebSocket(wsUrl);
 
@@ -107,6 +116,7 @@ rosnodejs.initNode('/my_ros_node')
                         connect_bool = receivedData.connect_bool;
                         // 定期發送資訊
                         if (connect_bool) {
+                            Error_Disconnect_appear = false;
                             // 如果 connect_bool 为 true 并且定时器尚未启动，则启动定时器
                             sendcar_status = setInterval(() => {
                                 ws.send(JSON.stringify({
@@ -124,33 +134,41 @@ rosnodejs.initNode('/my_ros_node')
                             sendcar_status = null;
                         }
                     }
-                    // 進一步處理receivedData
+
 
                     //Relocation publish to ROS//
                     if (receivedDatastruct.relocation_initpose_bool) {
+                        navigationStatus = '已重新定位於地圖座標(0,0,0)';
                         let msg = new std_msgs.Int16();
                         msg.data = receivedDatastruct.relocation_initpose_value;
-                        console.log("Relocation" + msg);
+                        console.log("Relocation: " + msg.data);
                         initialize_Relocation_pub.publish(msg);
                         receivedDatastruct.relocation_initpose_bool = false;
                     }
 
+                    if (receivedDatastruct.User_Error_Disconnect == true) {
+                        Error_Disconnect_appear = true;
+                        navigationStatus = '網頁連線中斷,AGV已停止,請校正回自動模式,任務才會繼續';
+                        let msg = new std_msgs.Bool();
+                        msg.data = receivedDatastruct.User_Error_Disconnect;
+                        control_mode_pub.publish(msg);
+                        console.log("User_Error_connect: " + receivedDatastruct.User_Error_Disconnect);
+                    }
+
                     //Path Cancel publish to ROS//
                     if (receivedDatastruct.path_cancel_bool == true) {
-                        navigationStatus = '已重新定位於地圖座標(0,0,0)';
                         let msg = new std_msgs.Int8();
                         msg.data = receivedDatastruct.path_cancel_value;
-                        console.log("path_cancel" + msg);
+                        console.log("path_cancel: " + msg.data);
                         stopnavigation_pub.publish(msg);
                         receivedDatastruct.path_cancel_bool = false;
-                        
                     }
 
                     //Control Mode publish to ROS//
                     if (receivedDatastruct.control_mode_bool == true) {
                         let msg = new std_msgs.Bool();
                         msg.data = receivedDatastruct.control_mode_value;
-                        console.log("control_mode" + msg);
+                        console.log("control_mode: " + msg);
                         control_mode_pub.publish(msg);
                         receivedDatastruct.control_mode_bool = false;
                     }
