@@ -17,6 +17,7 @@ app.use(express.json());
 
 let currentPose = null;
 let navigationStatus;
+let startnavigation_status;
 let joystickStatus = false;
 let map_match_ratio;
 let sendcar_status;
@@ -32,6 +33,7 @@ let receivedDatastruct = {
     go_home_bool: false,
     multiple_points: [],
     multiple_points_bool: false,
+    startnavigation_status: false,
 };
 
 // 初始化ROS節點
@@ -73,6 +75,11 @@ rosnodejs.initNode('/my_ros_node')
                 receivedDatastruct.go_home_bool = false;
             }
 
+        });
+
+        nh.subscribe('/startNavigation', 'std_msgs/Bool', (msg) => {
+            startnavigation_status = msg.data;
+            console.log("startNavigation: " + startnavigation_status);
         });
 
         // ---------------subscribe-------------------//
@@ -126,6 +133,7 @@ rosnodejs.initNode('/my_ros_node')
                                     joystickStatus: joystickStatus,
                                     currentPose: currentPose,
                                     map_match_ratio: map_match_ratio,
+                                    startnavigation_status: startnavigation_status,
                                 }));
                             }, sendInterval);
                         } else {
