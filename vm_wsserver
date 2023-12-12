@@ -4,11 +4,13 @@ const http = require("http");
 const bodyParser = require('body-parser');
 const WebSocket = require("ws");
 const cors = require("cors");
+const AgvMailRouter = require('./AGV_mail_Router.js')
 
 const app = express();
 const port = 9090;
 const HEARTBEAT_INTERVAL_TO_client = 20000; // heartbeat 20s
 const HEARTBEAT_INTERVAL_Receive_From_webuser = 1000; // heartbeat 20s
+
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
@@ -52,7 +54,8 @@ wss.on("connection", function connection(ws) {
           navigationStatus: receivedData.navigationStatus,
           joystickStatus: receivedData.joystickStatus,
           currentPose: receivedData.currentPose,
-          map_match_ratio: receivedData.map_match_ratio
+          map_match_ratio: receivedData.map_match_ratio,
+          startnavigation_status: receivedData.startnavigation_status,
         });
         // console.log(clientId + "Client data updated:", JSON.stringify(clientDataMap.get(clientId)));
       }
@@ -77,6 +80,8 @@ wss.on("connection", function connection(ws) {
     });
   });
 });
+
+app.use('/AGVMail', AgvMailRouter);
 
 //------cors setting------//
 app.use((req, res, next) => {
@@ -119,6 +124,7 @@ app.post("/connect", (req, res) => {
       connect: "Success Connected to the server.", //connect msg
       navigationStatus: clientData.navigationStatus, //navigation status
       joystickStatus: clientData.joystickStatus, //joystick status
+      startnavigation_status: clientData.startnavigation_status, //startnavigation status
     });
   } else {
     res.status(404).send("No pose information available for client " + targetClientId);
@@ -304,6 +310,8 @@ app.post("/go_home", express.json(), (req, res) => {
     res.status(400).send("Invalid parameters provided.");
   }
 });
+
+
 
 // 使用HTTP服務器來監聽端口，而不是直接使用Express應用
 server.listen(port, () => {
