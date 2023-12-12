@@ -17,6 +17,7 @@ from std_msgs.msg import Int16 as Relocation_initpose_Msg
 from std_msgs.msg import String as Navigation_Status_Msg
 from std_msgs.msg import UInt8 as button_status_msg
 from std_msgs.msg import UInt8 as onesite_arrived_msg
+from std_msgs.msg import Bool as startNavigation_msg
 from geometry_msgs.msg import Twist
 
 
@@ -95,7 +96,7 @@ def navigation():
 
 def stoppath_navigation():
     onesite_arrived = onesite_arrived_msg()
-    onesite_arrived.data = 0xBC  #arduino led red light
+    onesite_arrived.data = 0xBC  # arduino led red light
     Onesite_arrived_pub.publish(onesite_arrived)
 
     stopclient = actionlib.SimpleActionClient('move_base', MoveBaseAction)
@@ -121,7 +122,6 @@ def stoppath_navigation():
     home.target_pose.pose.orientation.z = 0
     home.target_pose.pose.orientation.w = 1
     stopclient.send_goal(home)
-
 
     stopclient.wait_for_result() 
     result = stopclient.get_state()
@@ -171,9 +171,11 @@ def Stop_Navigation_control(stopnavigationSend):
     control_signal = str(stopnavigationSend.data)
     rospy.loginfo("stopnavigationSend: %s", control_signal)
 
+
 # multiple goals navigation
 def multiple_goals_navigation(pose_array_msg):
     onesite_arrived = onesite_arrived_msg()
+    startNavigation = startNavigation_msg()
     goals = []
     global control_signal
     goal_count = -1  # start site is site 0
@@ -193,30 +195,32 @@ def multiple_goals_navigation(pose_array_msg):
     # Move to all goals
     for goal in goals: 
         goal_count += 1
-        
+        startNavigation.data = True
+        StartNavigation_pub.publish(startNavigation)
+
         if goal_count == 0 and button_status != 0x00:
             continue  # 如果button_status不是0x00，则跳过此目标
 
         # 当goal_count>0时，需要等待button_status变为0xAA才继续移动
         elif goal_count > 0:
             start_time = rospy.Time.now()
-            Navigation_Status_pub.publish("Waiting for Recipient check things and Pressed button for next goal " + str(goal_count))
+            Navigation_Status_pub.publish("等待收件者取物及按下確認按鈕 " + str(goal_count))
             while button_status != 0xAA:
-                Navigation_Status_pub.publish("Waiting for 30sec or Waiting Recipient take things Pressed button for next goal " + str(goal_count))
+                Navigation_Status_pub.publish("已到達目標點,等待30秒或收件者按下確認紐 ,即前往下一個標點Site: " + str(goal_count+1))
                 if (rospy.Time.now() - start_time).to_sec() > 30:
-                    Navigation_Status_pub.publish("Waiting for 30sec, Recipent didn't press button, going next goal")
+                    Navigation_Status_pub.publish("等待30秒, 收件者未按下確認紐, 即將前往目標點Site: " + str(goal_count+1))
                     break
                 elif control_signal == "34":
                     break
                 rospy.sleep(0.1)  # 等待button_status更新为0xAA
 
-        if control_signal == "34":
-            Navigation_Status_pub.publish("Interrupted Stie " + str(goal_count) + " and going back to origin")
-            if stoppath_navigation():
-                onesite_arrived.data = 0xBD  #arduino led red off
-                Onesite_arrived_pub.publish(onesite_arrived)
-                Navigation_Status_pub.publish("back to origin")
-            return
+        # if control_signal == "34":
+        #     Navigation_Status_pub.publish("Interrupted Stie " + str(goal_count) + " and going back to origin")
+        #     if stoppath_navigation():
+        #         onesite_arrived.data = 0xBD  #arduino led red off
+        #         Onesite_arrived_pub.publish(onesite_arrived)
+        #         Navigation_Status_pub.publish("back to origin")
+        #     return
 
         rospy.loginfo("Proceeding to goal " + str(goal_count))
 
@@ -226,23 +230,36 @@ def multiple_goals_navigation(pose_array_msg):
         rospy.loginfo("state:  " + str(state))
         onesite_arrived.data = 0xBD
         Onesite_arrived_pub.publish(onesite_arrived)
-        Navigation_Status_pub.publish("Moving...." + " Goal : Site" + str(goal_count))
+        Navigation_Status_pub.publish("正在移動到目標點" + " Site :" + str(goal_count))
+        
         
         # Use a loop to continuously check for control_signal while moving to the goal
         while not client.get_state() in [actionlib.GoalStatus.SUCCEEDED, actionlib.GoalStatus.ABORTED, actionlib.GoalStatus.PREEMPTED]:
+            if control_signal == "34":
+                Navigation_Status_pub.publish("任務取消於 Site: " + str(goal_count) + "  正在返回原點中")
+                if stoppath_navigation():
+                    onesite_arrived.data = 0xBD  # arduino led red off
+                    Onesite_arrived_pub.publish(onesite_arrived)
+                    Navigation_Status_pub.publish("已經返回原點")
+                    startNavigation.data = False #deliver to website to know the navigation is finished
+                    StartNavigation_pub.publish(startNavigation)
+                return
             rospy.sleep(0.1)
             
         # Check if arrived at the goal or if there was an error
         if client.get_state() == actionlib.GoalStatus.SUCCEEDED:
-            Navigation_Status_pub.publish("Goal Arrived Site " + str(goal_count) + ", moving to next goal.")
-            onesite_arrived.data = 0xBB #arduino led green light
+            Navigation_Status_pub.publish("已到達目標點Site: " + str(goal_count) + ", 正在移動到下一個點")
+            onesite_arrived.data = 0xBB  # arduino led green light
             Onesite_arrived_pub.publish(onesite_arrived)
         else:
-            Navigation_Status_pub.publish("Error reaching goal Site " + str(goal_count))
+            Navigation_Status_pub.publish("無法到達目標點Site: " + str(goal_count)+" ,請確認車子狀況")
     
-    Navigation_Status_pub.publish('All goals arrived.')
-    onesite_arrived.data = 0xBD
+    Navigation_Status_pub.publish('任務點位皆已完成')
+    rospy.sleep(1.5)
+    onesite_arrived.data = 0xBD  # arduino all led off
     Onesite_arrived_pub.publish(onesite_arrived)
+    startNavigation.data = False
+    StartNavigation_pub.publish(startNavigation)
 
   
 def button_receiver_callback(button_receiver):
@@ -265,6 +282,7 @@ if __name__ == '__main__':
         Relocation_initpose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
         Navigation_Status_pub = rospy.Publisher('/navigation_status', Navigation_Status_Msg, queue_size=20)
         Onesite_arrived_pub = rospy.Publisher('/onesite_arrived', onesite_arrived_msg, queue_size=2)
+        StartNavigation_pub = rospy.Publisher('/startNavigation', startNavigation_msg, queue_size=2)
 
         #global variables-------------------------------------------------------------------------------------------------------------
         control_signal = None
