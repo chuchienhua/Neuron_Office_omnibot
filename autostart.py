@@ -1,3 +1,8 @@
+##prompt: "Go to the bedroom"
+                    returns: {"action": "go_to_goal", "params": {"location": {"type": "string", "value": "bedroom"}}}
+
+                    prompt: "Go to the bedroom,then go to the kitchen"
+                    returns: {"action": "sequence", "params": [{"action": "go_to_goal", "params": {"location": {"type": "string", "value": "bedroom"}}}, {"action": "go_to_goal", "params": {"location": {"type": "string", "value": "kitchen"}}}]}
 import pyautogui
 import time
 
