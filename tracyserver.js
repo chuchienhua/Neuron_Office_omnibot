@@ -45,6 +45,9 @@ rosnodejs.initNode('/my_ros_node')
           let msg = new std_msgs.String();
           msg.data = chatgpt_ask;
           console.log(msg);
+         
+           //postman 測試時以下publish可以先註解 
+           //publish 會把msg 給到navigation_to_save_points.py
          //  chatgpt_ask_pub.publish(msg);
           
         }
