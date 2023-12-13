@@ -14,7 +14,7 @@ const HEARTBEAT_INTERVAL_Receive_From_webuser = 1000; // heartbeat 20s
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
-let relocation_initpose_bool, path_cancel_bool, go_home_bool, multiple_points_bool, control_mode_bool;
+let relocation_initpose_bool, path_cancel_bool, go_home_bool, multiple_points_bool, control_mode_bool, chatgpt_msg_bool;
 let lastHeartbeatTime = 0;
 const HEARTBEAT_TIMEOUT = 5000;
 
@@ -182,6 +182,27 @@ app.post("/current_pose", (req, res) => {
     });
   } else {
     res.status(404).send("No pose information available.");
+  }
+});
+
+// API chatgpt msg
+app.post("/chatgpt_msg", (req, res) => {
+  const targetClientId = req.body.carid;
+  const chatgpt_msg = req.body.chatgpt_msg;
+  const targetClient = clientMap.get(targetClientId);
+  chatgpt_msg_bool = true;
+  if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+    targetClient.send(
+      JSON.stringify({
+        chatgpt_msg_bool: chatgpt_msg_bool,
+        chatgpt_msg: chatgpt_msg,
+      })
+    );
+    console.log("Received chatgpt_msg value:", chatgpt_msg);
+    res.status(200).send("Chatgpt_MSG Message published successfully.");
+  } else {
+    chatgpt_msg_bool = false;
+    res.status(400).send("No valid deliver chatgpt_msg.");
   }
 });
 
