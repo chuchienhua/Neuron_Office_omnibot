@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const cors = require('cors');
 
 const app = express();
-const wsUrl = 'ws://192.168.103.123:9090';
+const wsUrl = 'ws://192.168.103.128:9090';
 const port = 3000;
 const sendInterval = 500; // 0.5 second
 const reconnectInterval = 3000; // 重新連接的間隔（毫秒）
@@ -34,6 +34,8 @@ let receivedDatastruct = {
     multiple_points: [],
     multiple_points_bool: false,
     startnavigation_status: false,
+    chatgpt_msg_bool: false,
+    chatgpt_msg: null,
 };
 
 // 初始化ROS節點
@@ -91,6 +93,7 @@ rosnodejs.initNode('/my_ros_node')
         let initialize_Relocation_pub = nh.advertise('/initialize_Relocation', std_msgs.Int16);
         let stopnavigation_pub = nh.advertise("/stopnavigationSend", std_msgs.Int8);
         let control_mode_pub = nh.advertise("/control_mode", std_msgs.Bool);
+        let chatgpt_ask_pub = nh.advertise("/chatgpt_ask", std_msgs.String);
 
         const geometry_msgs = rosnodejs.require('geometry_msgs').msg;
         let goalPub = nh.advertise('/move_base_simple/goal', geometry_msgs.PoseStamped);
@@ -154,6 +157,7 @@ rosnodejs.initNode('/my_ros_node')
                         receivedDatastruct.relocation_initpose_bool = false;
                     }
 
+                    //Error_Disconnect publish to ROS//
                     if (receivedDatastruct.User_Error_Disconnect == true) {
                         Error_Disconnect_appear = true;
                         navigationStatus = '網頁連線中斷,AGV已停止,請校正回自動模式,任務才會繼續';
@@ -161,6 +165,18 @@ rosnodejs.initNode('/my_ros_node')
                         msg.data = receivedDatastruct.User_Error_Disconnect;
                         control_mode_pub.publish(msg);
                         console.log("User_Error_connect: " + receivedDatastruct.User_Error_Disconnect);
+                    }
+
+                    //chatgpt_msg publish to ROS//
+                    if (receivedDatastruct.chatgpt_msg_bool == true) {
+                        chatgpt_msg_bool = true;
+                        let msg = new std_msgs.String();
+                        // msg.data = receivedDatastruct.chatgpt_msg;
+                        let encodedString = Buffer.from(receivedDatastruct.chatgpt_msg).toString('base64');
+                        msg.data = encodedString;
+                        chatgpt_ask_pub.publish(msg);
+                        console.log("chatgpt_ask_pub: " + receivedDatastruct.chatgpt_msg);
+                        receivedDatastruct.chatgpt_msg_bool = false;
                     }
 
                     //Path Cancel publish to ROS//
