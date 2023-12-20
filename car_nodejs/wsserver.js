@@ -1,15 +1,20 @@
-const TF_converter = require('./tf_converter/TF_converter.js');
-const rosnodejs = require('rosnodejs');
-const express = require('express');
-const WebSocket = require('ws');
-const cors = require('cors');
-
+// const TF_converter = require('./tf_converter/TF_converter.js');
+import TF_converter from './tf_converter/TF_converter.js';
+// const rosnodejs = require('rosnodejs');
+import rosnodejs from 'rosnodejs';
+// const express = require('express');
+import express from 'express';
+import WebSocket, { WebSocketServer } from 'ws';
+// const WebSocket = require('ws');
+// const cors = require('cors');
+import cors from 'cors';
 const app = express();
-const wsUrl = 'ws://192.168.103.128:9090';
-const port = 3000;
-const sendInterval = 500; // 0.5 second
+const wsUrl = 'ws://192.168.103.128:9090';//'ws://192.168.8.241:3562';
+const port = 3001;
+const sendInterval = 900; // 0.5 second
 const reconnectInterval = 3000; // 重新連接的間隔（毫秒）
-const bodyParser = require('body-parser');
+// const bodyParser = require('body-parser');
+import bodyParser from 'body-parser';
 app.use(cors()); // 这里添加CORS中间件
 app.use(bodyParser.json());
 app.use(express.json());
@@ -19,9 +24,12 @@ let currentPose = null;
 let navigationStatus;
 let startnavigation_status;
 let joystickStatus = false;
+let control_mode = false;
 let map_match_ratio;
 let sendcar_status;
 let go_home_msgs;
+let chatgpt_location_name;
+let last_chatgpt_location_name;
 let Error_Disconnect_appear = false;
 let connect_bool = false;
 let receivedDatastruct = {
@@ -45,6 +53,7 @@ rosnodejs.initNode('/my_ros_node')
         // ---------------subscribe-------------------//
 
         const nh = rosnodejs.nh;
+
         nh.subscribe('/amcl_pose', 'geometry_msgs/PoseWithCovarianceStamped', (msg) => {
             currentPose = msg.pose.pose; // 儲存當前位置
         });
@@ -58,7 +67,7 @@ rosnodejs.initNode('/my_ros_node')
                 if (Error_Disconnect_appear == false) {
                     navigationStatus = '手動模式切換成功';
                 } else {
-                    navigationStatus = '網頁連線中斷,AGV已停止,請校正回自動模式,任務才會繼續';
+                    navigationStatus = '網頁連線中斷,AGV已停止,請校正回自動模式,任務才會繼續或派車';
                 }
             } else {
                 navigationStatus = '自動模式切換成功';
@@ -82,6 +91,11 @@ rosnodejs.initNode('/my_ros_node')
         nh.subscribe('/startNavigation', 'std_msgs/Bool', (msg) => {
             startnavigation_status = msg.data;
             console.log("startNavigation: " + startnavigation_status);
+        });
+
+        nh.subscribe('/location_name', 'std_msgs/String', (msg) => {
+            chatgpt_location_name = msg.data;
+            console.log("chatgpt_location_name: " + chatgpt_location_name);
         });
 
         // ---------------subscribe-------------------//
@@ -129,7 +143,7 @@ rosnodejs.initNode('/my_ros_node')
                             Error_Disconnect_appear = false;
                             // 如果 connect_bool 为 true 并且定时器尚未启动，则启动定时器
                             sendcar_status = setInterval(() => {
-                                ws.send(JSON.stringify({
+                                const sendData = {
                                     clientId: 0x01,
                                     connect: 'Success Connected to the server.',
                                     navigationStatus: navigationStatus,
@@ -137,7 +151,13 @@ rosnodejs.initNode('/my_ros_node')
                                     currentPose: currentPose,
                                     map_match_ratio: map_match_ratio,
                                     startnavigation_status: startnavigation_status,
-                                }));
+                                };
+
+                                // 如果 chatgpt_location_name 有值，則添加到發送數據中
+                                sendData.chatgpt_location_name = chatgpt_location_name;
+
+                                // 發送數據
+                                ws.send(JSON.stringify(sendData));
                             }, sendInterval);
                         } else {
                             // 如果 connect_bool 为 false 并且定时器已经启动，则停止定时器
@@ -146,6 +166,18 @@ rosnodejs.initNode('/my_ros_node')
                         }
                     }
 
+                    //Control Mode publish to ROS//
+                    if (receivedDatastruct.control_mode_bool == true) {
+                        let msg = new std_msgs.Bool();
+                        console.log("control_mode_value: " + receivedDatastruct.control_mode_value);
+                        if (receivedDatastruct.control_mode_value == 42) {
+                            control_mode = !control_mode;
+                            msg.data = control_mode;
+                            console.log("control_mode: " + msg.data);
+                            control_mode_pub.publish(msg);
+                        }
+                        receivedDatastruct.control_mode_bool = false;
+                    }
 
                     //Relocation publish to ROS//
                     if (receivedDatastruct.relocation_initpose_bool) {
@@ -169,7 +201,7 @@ rosnodejs.initNode('/my_ros_node')
 
                     //chatgpt_msg publish to ROS//
                     if (receivedDatastruct.chatgpt_msg_bool == true) {
-                        chatgpt_msg_bool = true;
+                        // chatgpt_msg_bool = true;
                         let msg = new std_msgs.String();
                         // msg.data = receivedDatastruct.chatgpt_msg;
                         let encodedString = Buffer.from(receivedDatastruct.chatgpt_msg).toString('base64');
@@ -188,14 +220,6 @@ rosnodejs.initNode('/my_ros_node')
                         receivedDatastruct.path_cancel_bool = false;
                     }
 
-                    //Control Mode publish to ROS//
-                    if (receivedDatastruct.control_mode_bool == true) {
-                        let msg = new std_msgs.Bool();
-                        msg.data = receivedDatastruct.control_mode_value;
-                        console.log("control_mode: " + msg);
-                        control_mode_pub.publish(msg);
-                        receivedDatastruct.control_mode_bool = false;
-                    }
 
                     //Go Home publish to ROS//
                     if (receivedDatastruct.go_home_bool == true) {
