@@ -1,0 +1,80 @@
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    max-width: 600px;
+    margin: 0 auto;
+   
+   }
+   
+   .input-chatgpt-container {
+    display: flex;
+    margin-bottom: 10px;
+   }
+   
+   input[type='text'] {
+    flex: 1;
+    padding: 10px;
+    margin-right: 10px;
+   }
+   
+   button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+   }
+   
+   button:hover {
+    background-color: #0056b3;
+   }
+   
+   .message-container {
+    display: flex;
+    flex-direction: column; /* 確保內容垂直堆疊 */
+    max-height: 500px; /* 或您希望的高度 */
+    max-width: 100%;
+    overflow-y: auto; /* 啟用垂直滾動 */
+    border: 1px solid #525050; /* 可選，增加邊框 */
+    border-radius: 10px;
+    padding: 10px;
+    background-color: #fff; /* 可選，設定背景色 */
+  }
+  
+   
+   .message {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 20px;
+    max-width: 70%;
+    word-wrap: break-word;
+    
+   }
+   
+   .clear-button {
+    background-color: #ffc107;
+    color: white;
+   }
+   
+   .clear-button:hover {
+    background-color: #ff9800;
+   }
+
+   .user-message, .chat-gpt-response {
+    padding: 5px 10px;
+    margin-bottom: 5px;
+    background-color: #f0f0f0; /* 可選，設定背景色 */
+    border-radius: 10px;
+    word-wrap: break-word;
+  }
+  
+  .user-message {
+    align-self: flex-end; /* 對於用戶消息，靠右對齊 */
+    background-color: #daf1da; /* 可選，設定不同的背景色 */
+  }
+  
+  .chat-gpt-response {
+    align-self: flex-start; /* 對於回應消息，靠左對齊 */
+    background-color: #f0f0f0; /* 可選，設定不同的背景色 */
+  }
+  

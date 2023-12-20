@@ -1,0 +1,28 @@
+
+.nav-tabs .nav-link.active {
+  background-color: rgb(125, 126, 216) !important;
+  color: white !important;
+  border-color: black !important;
+}
+
+.nav-tabs .nav-link {
+  background-color: rgb(255, 255, 255) !important;
+  color: black !important;
+  border-color: black !important;
+}
+
+.custom-tab-border .nav-item {
+  border-bottom: 2px solid #000;
+}
+
+.handsontable td {
+  border: 1px solid #000;
+}
+
+
+
+
+
+
+
+
