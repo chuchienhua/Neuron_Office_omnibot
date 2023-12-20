@@ -48,20 +48,21 @@ wss.on("connection", function connection(ws) {
         clientMap.set(clientId, ws);
         console.log("Client connected with ID:", clientId);
       }
-      if (clientId) {
-        clientMap.set(clientId, ws);
-        clientDataMap.set(clientId, {
-          navigationStatus: receivedData.navigationStatus,
-          joystickStatus: receivedData.joystickStatus,
-          currentPose: receivedData.currentPose,
-          map_match_ratio: receivedData.map_match_ratio,
-          startnavigation_status: receivedData.startnavigation_status,
-        });
-        // console.log(clientId + "Client data updated:", JSON.stringify(clientDataMap.get(clientId)));
-      }
-      else {
-        console.log("Warning: Received message without clientId.");
-      }
+          if (clientId) {
+      // 更新 clientDataMap
+      const clientData = clientDataMap.get(clientId) || {};
+      clientDataMap.set(clientId, {
+        ...clientData,
+        navigationStatus: receivedData.navigationStatus,
+        joystickStatus: receivedData.joystickStatus,
+        currentPose: receivedData.currentPose,
+        map_match_ratio: receivedData.map_match_ratio,
+        startnavigation_status: receivedData.startnavigation_status,
+        chatgpt_location_name: receivedData.chatgpt_location_name  // 确保更新这个字段
+      });
+    } else {
+      console.log("Warning: Received message without clientId.");
+    }
       //Only not connect keep communication, don't let client disconnect
       if (receivedData.heartbeat === 0XAB) {
         console.log("Heartbeat received from client");
@@ -93,7 +94,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 //-------------------------API-------------------------//
 // API connect check / navigationStatus / joystickStatus
 app.post("/connect", (req, res) => {
@@ -122,8 +122,6 @@ app.post("/connect", (req, res) => {
   if (clientData) {
     res.status(200).send({
       connect: "Success Connected to the server.", //connect msg
-      navigationStatus: clientData.navigationStatus, //navigation status
-      joystickStatus: clientData.joystickStatus, //joystick status
       startnavigation_status: clientData.startnavigation_status, //startnavigation status
     });
   } else {
@@ -179,6 +177,8 @@ app.post("/current_pose", (req, res) => {
     res.status(200).send({
       currentPose: clientData.currentPose,
       map_match_ratio: clientData.map_match_ratio,
+      navigationStatus: clientData.navigationStatus, //navigation status
+      joystickStatus: clientData.joystickStatus, //joystick status
     });
   } else {
     res.status(404).send("No pose information available.");
@@ -186,11 +186,14 @@ app.post("/current_pose", (req, res) => {
 });
 
 // API chatgpt msg
+// API chatgpt msg
 app.post("/chatgpt_msg", (req, res) => {
   const targetClientId = req.body.carid;
   const chatgpt_msg = req.body.chatgpt_msg;
   const targetClient = clientMap.get(targetClientId);
+  const clientData = clientDataMap.get(targetClientId);
   chatgpt_msg_bool = true;
+
   if (targetClient && targetClient.readyState === WebSocket.OPEN) {
     targetClient.send(
       JSON.stringify({
@@ -199,12 +202,19 @@ app.post("/chatgpt_msg", (req, res) => {
       })
     );
     console.log("Received chatgpt_msg value:", chatgpt_msg);
-    res.status(200).send("Chatgpt_MSG Message published successfully.");
+
+    // 延迟 2 秒后发送响应
+    setTimeout(() => {
+      // 重新获取 clientData 以确保是最新的
+      const updatedClientData = clientDataMap.get(targetClientId);
+      res.status(200).send({ chatgpt_location_name: updatedClientData?.chatgpt_location_name });
+    }, 2000);  // 延迟 2 秒
   } else {
     chatgpt_msg_bool = false;
     res.status(400).send("No valid deliver chatgpt_msg.");
   }
 });
+
 
 //API Change_contorl_mode
 app.post("/control_mode", express.json(), (req, res) => {
