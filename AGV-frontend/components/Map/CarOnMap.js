@@ -1,28 +1,21 @@
 // CarOnMap.js
 import React, { memo } from "react";
 import carimage from "./car.png";
+import "./CarOnMap.css";
 
-const CarOnMap = memo(({ mapX, mapY , yaw }) => {
+const CarOnMap = memo(({ mapX, mapY, yaw }) => {
   return (
     <div
+      className="car-on-map"
       style={{
-        position: "absolute",
-        top: `${mapY}`, // y %
-        left: `${mapX}`, // x %
-        width: "32px",
-        height: "32px",
-   
+        top: mapY, // 使用正确的单位
+        left: mapX, // 使用正确的单位
         backgroundImage: `url(${carimage})`,
-        // backgroundColor: "rgba(255, 0, 0, 0.5)",
-        backgroundSize: "contain", // 确保图片按比例缩放
-        backgroundRepeat: "no-repeat", // 防止图片重复
         transform: `translate(-50%, -50%) rotate(${yaw}deg)`,
-        borderRadius: "50%",
-        cursor: "pointer",
-        pointerEvents: "none",
       }}
     />
   );
 });
 
 export default CarOnMap;
+
