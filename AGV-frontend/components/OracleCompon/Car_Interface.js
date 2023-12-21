@@ -3,16 +3,23 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { registerAllCellTypes } from "handsontable/cellTypes";
 import axios from "axios";
-import Utils from "../../Utils.js"
+import Tab from "react-bootstrap/Tab";
+import Tabs from "react-bootstrap/Tabs";
+import Utils from "../../Utils"
 import "./HomeOracle.css";
-import "./Car_Interface_2.css";
+import "./Car_Interface.css";
+import MapPoint from "../Map/MapPoint.js";
+import CarOnMap from "../Map/CarOnMap.js";
 import initialPoints from "../Map/InitialPoints.js";
+import mapImage from "../Map/namemap4.png";
 import quaternionToYaw from "../TFconvert/quaternionToYaw.js";
 import { saveCarList, pathCar_cancel } from "../Goalhistory/GoalList.js";
 import { toast } from "react-toastify";
-function Car_Interface_2({ onMapData }) {
-  const user = useSelector((state) => state.user);
+import Car_Interface_copy from "./Car_Interface_2.js";
+import ChatTab from "./ChatTab.js";
+function Car_Interface() {
   registerAllCellTypes();
+  const user = useSelector((state) => state.user);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [AppTabs, setAppTabs] = useState("CarInfo");
@@ -22,13 +29,11 @@ function Car_Interface_2({ onMapData }) {
     position: { x: null, y: null },
     orientation: { z: null, w: null },
   });
-
   const [FirstConnect_check, setFirstConnect_check] = useState(false);
   const [carYaw, setCarYaw] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
   const [carConnect, setCarConnect] = useState(false);
   const [carConnectMsg, setCarConnectMsg] = useState("");
-  const [start_navigation, setStart_navigation] = useState(false);
   const [navigatgionStatusMsg, setNavigatgionStatusMsg] = useState(
     "顯示自動導航目前狀態"
   );
@@ -47,7 +52,11 @@ function Car_Interface_2({ onMapData }) {
   const [mapX, setMapX] = useState("");
   const [mapY, setMapY] = useState("");
   const [mapyaw, setMapyaw] = useState("");
+  const [map2X, setMap2X] = useState("");
+  const [map2Y, setMap2Y] = useState("");
+  const [map2yaw, setMap2yaw] = useState("");
   const [controlmode, setControlmode] = useState("");
+  const [start_navigation, setStart_navigation] = useState(false);
   const [searchMode, setSearchMode] = useState("Dispatch_Mode");
   const [searchTerm, setSearchTerm] = useState("");
   const [map_match_ratio, setMap_match_ratio] = useState("");
@@ -56,13 +65,53 @@ function Car_Interface_2({ onMapData }) {
   const [sameRatioCount, setSameRatioCount] = useState(0);
   const [connect_heartbeat, setConnect_heartbeat] = useState(0);
   const map_match_parameter = 0.5;
-  // const Carurl = "http://192.168.103.171:3000/";
+  // const Carurl = "http://192.168.103.128:9090/";
   const Carurl = "http://192.168.8.241:3561/"; //TP_IOT
+
+  const [points, setPoints] = useState(initialPoints);
+
+  const [hoverInfo, setHoverInfo] = useState({
+    visible: false,
+    name: "",
+    x: 0,
+    y: 0,
+    yaw: 0,
+  });
 
   const trStyle = (index, selectedIndex) => ({
     backgroundColor: selectedIndex === index ? "#f2f2f2" : "#fff",
     cursor: "pointer", // Add pointer on hover over the rows
   });
+
+  const getCarList = async () => {
+    setIsExpanded(null);
+    const apiurl = Utils.getURL("newmember/get_car_pointlist");
+    try {
+      const response = await axios.get(apiurl);
+      setRecords_carpoint(response.data);
+    } catch (error) {
+      console.error("Error fetching data: ", error);
+    }
+  };
+
+  //地圖上滑鼠進入紅點
+  const handleMouseEnter = (point) => {
+    setHoverInfo({ visible: true, name: point.name, x: point.x, y: point.y, yaw: point.yaw });
+  };
+
+  //地圖上滑鼠離開紅點
+  const handleMouseLeave = () => {
+    setHoverInfo({ visible: false, name: "", x: 0, y: 0, yaw: 0 });
+  };
+
+  //地圖上點擊紅點
+  const handlePointClick = (point) => {
+    setHoverInfo({ visible: true, x: point.x, y: point.y, yaw: point.yaw });
+    setDispatch_Name(point.name.toString());
+    setDispatch_x(point.x.toString());
+    setDispatch_y(point.y.toString());
+    setDispatch_z(point.yaw.toString());
+  };
 
   //增加點位
   const addPoint = () => {
@@ -117,16 +166,11 @@ function Car_Interface_2({ onMapData }) {
     setSite(0);
     setSelectedIndex(null);
   };
+
   // 修改按鈕的事件處理器
   const handleConnectButtonClick = () => {
     setCarConnect(!carConnect);
   };
-
-  useEffect(() => {
-    if (onMapData && typeof onMapData === 'function') {
-      onMapData(mapX, mapY, mapyaw);
-    }
-  }, [mapX, mapY, mapyaw, onMapData]);
 
   //建立連線
   useEffect(() => {
@@ -142,19 +186,18 @@ function Car_Interface_2({ onMapData }) {
       });
     };
 
-    // 封装心跳发送逻辑
+    // 心跳封包發送
     const sendHeartbeat = async (heartbeatValue) => {
       try {
         const response = await axios.post(Carurl + "connect", {
-          carid: 0x02,
+          carid: 0x01,
           carconnect_bool: true,
           connect_heartbeat: heartbeatValue
         });
         lastDataReceivedTime = Date.now(); // 成功接收數據時更新時間
         setCarConnectMsg(response.data.connect); // 更新状态
         setStart_navigation(response.data.startnavigation_status)
-        // setNavigatgionStatusMsg(response.data.navigationStatus); // 更新状态
-        // setControlmode(response.data.joystickStatus);
+        // console.log(response.data);
         // console.log(response);
         if (JSON.stringify(response.status) === "200") {
           setFirstConnect_check(true);
@@ -166,7 +209,7 @@ function Car_Interface_2({ onMapData }) {
     };
     const disconnect = async () => {
       try {
-        response = await axios.post(Carurl + "disconnect", { carid: 0x02, carconnect_bool: false });
+        response = await axios.post(Carurl + "disconnect", { carid: 0x01, carconnect_bool: false });
         console.log(response.data.disconnect);
         window.location.reload();
       } catch (error) {
@@ -198,7 +241,6 @@ function Car_Interface_2({ onMapData }) {
         clearInterval(checkDataTimeout); // 清除檢查超時定時器
       };
     } else {
-      disconnect();
       setFirstConnect_check(false);
       setIsPolling(false);
       setNavigatgionStatusMsg("顯示自動導航目前狀態");
@@ -221,6 +263,7 @@ function Car_Interface_2({ onMapData }) {
       setSameRatioCount(0); //防止斷掉後 值還在繼續送
       setMap_match_ratio(''); //初始 map_match_ratio
       setConnect_heartbeat(0);
+      disconnect();
     }
   }, [carConnect]);
 
@@ -232,7 +275,7 @@ function Car_Interface_2({ onMapData }) {
         try {
           const response = await axios
             .post(Carurl + "current_pose", {
-              carid: 0x02,
+              carid: 0x01,
             });
           const data = response.data;
           setNavigatgionStatusMsg(data.navigationStatus); // 更新状态
@@ -291,15 +334,15 @@ function Car_Interface_2({ onMapData }) {
 
   //確認導航中是否斷線
   useEffect(() => {
-    console.log(start_navigation);
-    if (start_navigation) {
-      if (!carConnect) {
+    console.log( start_navigation);
+    if(start_navigation){
+      if(!carConnect){
         console.log("導航中斷線");
         AGV_problem_mail();
       }
     }
 
-  }, [carConnect, start_navigation])
+  },[carConnect , start_navigation])
 
   //位置 TF 4元素轉換
   useEffect(() => {
@@ -336,7 +379,7 @@ function Car_Interface_2({ onMapData }) {
   const Car_Go_Home = () => {
     axios
       .post(Carurl + "go_home", {
-        carid: 0x02,
+        carid: 0x01,
         go_home_value: 40, //ROS value setting Int8 40
       })
       .then((res) => {
@@ -352,8 +395,8 @@ function Car_Interface_2({ onMapData }) {
     setcar_mode(!car_mode);
     axios
       .post(Carurl + "control_mode", {
-        carid: 0x02,
-        control_mode: 42, //ROS value setting Int8 40
+        carid: 0x01,
+        control_mode: 42 , //car_mode, //ROS value setting Int8 40
       })
       .then((res) => {
         set_go_home_msg(res.data);
@@ -367,7 +410,7 @@ function Car_Interface_2({ onMapData }) {
   const Relocation_initpose = () => {
     axios
       .post(Carurl + "relocation_initpose", {
-        carid: 0x02,
+        carid: 0x01,
         relocation_initpose_value: 38, //ROS value setting 38
       })
       .then((res) => {
@@ -403,7 +446,7 @@ function Car_Interface_2({ onMapData }) {
     if (Is_map_match) {
       axios
         .post(Carurl + "set_goal", {
-          carid: 0x02,
+          carid: 0x01,
           multiple_points: Savecarpoint, //多點位
         })
         .then((res) => {
@@ -422,7 +465,7 @@ function Car_Interface_2({ onMapData }) {
   const Car_Path_Cancel = () => {
     axios
       .post(Carurl + "path_cancel", {
-        carid: 0x02,
+        carid: 0x01,
         path_cancel_value: 34, //ROS value setting 34
       })
       .then((res) => {
@@ -431,7 +474,7 @@ function Car_Interface_2({ onMapData }) {
       .catch((err) => {
         console.log(err);
       });
-    pathCar_cancel();
+    pathCar_cancel(); //存進mongodb
   };
 
   //郵件測試
@@ -516,294 +559,449 @@ function Car_Interface_2({ onMapData }) {
     }
   };
 
+  const handleAGV2Mapdata = (map2X, map2Y, map2yaw) => {
+    setMap2X(map2X);
+    setMap2Y(map2Y);
+    setMap2yaw(map2yaw);
+    
+  };  
+
   return (
     <div className="custom-background">
-      <div className="copy_content-wrapper">
-        <div className=" tabs-container">
-          <div className="ms-1">
-            <button
-              type="button"
-              className={
-                carConnect
-                  ? "btn btn-success btn-lg"
-                  : "btn btn-outline-danger btn-lg"
-              }
-              onClick={() => handleConnectButtonClick()} //setCarConnect(!carConnect)
-            >
-              {carConnect ? "已連線" : "連線"}
-            </button>
-            <span
-              className={
-                carConnect
-                  ? FirstConnect_check
-                    ? "connect-success-style-font ms-2"
-                    : "no-connect-success-style-font ms-2"
-                  : "no-connect-success-style-font ms-2"
-              }
-            >
-              {carConnect
-                ? FirstConnect_check
-                  ? carConnectMsg.toString()
-                  : "請確認Server正在運行，4秒後將斷線" //Make sure the car server is running, 4 Seconds Will be Disconnected
-                : "請按連線，連線成功後才能進行以下操作" //Please Click Connect to Car, Make sure to do the following.
-              }
-            </span>
-          </div>
-          <div>
-            <button
-              type="button"
-              className="btn btn-outline-danger mt-1 ms-1 "
-              //連上線才能開始偵測
-              onClick={() => setIsPolling(!isPolling)}
-            >
-              {isPolling && carConnect
-                ? "停止偵測車體資訊" //Stop detecting Infomation
-                : "開始偵測車體資訊" //Start detecting Infomation
-              }
-            </button>
-            <span className={"Map-match-style-font ms-2 mt-3"}>
-              {`地圖匹配率 : ${map_match_ratio}`}
-            </span>
-            <div className="position-container mt-1 ms-1">
-              <input
-                type="text"
-                className="control-position-input"
-                value={`控制模式 : ${carConnect ? (controlmode ? " 手動控制 " : " 自動控制 ") : " 等待連線 "}`}
-              />
-              <input
-                type="text"
-                className="position-input ms-2 "
-                value={`X方向 :  ${number.position.x}`}
-                readOnly
-              />
-              <input
-                type="text"
-                className="position-input ms-2"
-                value={`Y方向 :  ${number.position.y}`}
-                readOnly
-              />
-              <input
-                type="text"
-                className="position-input ms-2"
-                value={`Yaw方向 :  ${Number(carYaw).toFixed(6)}`}
-                readOnly
-              />
-            </div>
-          </div>
-          <div className="position-container mt-1 ms-1">
-            <div className="input-group">
-              <span className="navigation-status-style-font mt-1">
-                自動導航狀態:
-              </span>
-              <input
-                type="text"
-                aria-label="X"
-                className="navigation-form-control ms-2"
-                placeholder="目前導航狀態 "
-                value={navigatgionStatusMsg}
-              />
-            </div>
-          </div>
-          <div className="mt-2 ms-1 button-input-container">
-            <button
-              type="button"
-              className="btn btn-success my-button "
-              onClick={() => {
-                if (FirstConnect_check) {
-                  Car_Go_Home();
-                }
-              }}
-            >
-              回到原點
-            </button>
-            {/* <input
+      <div className="content-wrapper">
+        <div className="mt-1 tabs-container">
+          <Tabs
+            defaultActiveKey="Car1Info"
+            onSelect={(key) => {
+              setAppTabs(key);
+            }}
+            id="uncontrolled-tab-example"
+            className="mb-3 custom-tab-border"
+          >
+            <Tab eventKey="Car1Info" title="AGV1派遣頁面">
+              <div className="ms-1">
+                <button
+                  type="button"
+                  className={
+                    carConnect
+                      ? "btn btn-success btn-lg"
+                      : "btn btn-outline-danger btn-lg"
+                  }
+                  onClick={() => handleConnectButtonClick()} //setCarConnect(!carConnect)
+                >
+                  {carConnect ? "已連線" : "連線"}
+                </button>
+                <span
+                  className={
+                    carConnect
+                      ? FirstConnect_check
+                        ? "connect-success-style-font ms-2"
+                        : "no-connect-success-style-font ms-2"
+                      : "no-connect-success-style-font ms-2"
+                  }
+                >
+                  {carConnect
+                    ? FirstConnect_check
+                      ? carConnectMsg.toString()
+                      : "請確認Server正在運行，4秒後將斷線" //Make sure the car server is running, 4 Seconds Will be Disconnected
+                    : "請按連線，連線成功後才能進行以下操作" //Please Click Connect to Car, Make sure to do the following.
+                  }
+                </span>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger mt-1 ms-1 "
+                  //連上線才能開始偵測
+                  onClick={() => setIsPolling(!isPolling)}
+                >
+                  {isPolling && carConnect
+                    ? "停止偵測車體資訊" //Stop detecting Infomation
+                    : "開始偵測車體資訊" //Start detecting Infomation
+                  }
+                </button>
+                <span className={"Map-match-style-font ms-2 mt-3"}>
+                  {`地圖匹配率 : ${map_match_ratio}`}
+                </span>
+                <div className="position-container mt-1 ms-1">
+                  <input
+                    type="text"
+                    className="control-position-input"
+                    value={`控制模式 : ${carConnect ? (controlmode ? " 手動控制 " : " 自動控制 ") : " 等待連線 "}`}
+                  />
+                  <input
+                    type="text"
+                    className="position-input ms-2 "
+                    value={`X方向 :  ${number.position.x}`}
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    className="position-input ms-2"
+                    value={`Y方向 :  ${number.position.y}`}
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    className="position-input ms-2"
+                    value={`Yaw方向 :  ${Number(carYaw).toFixed(6)}`}
+                    readOnly
+                  />
+                </div>
+              </div>
+              <div className="position-container mt-1 ms-1">
+                <div className="input-group">
+                  <span className="navigation-status-style-font mt-1">
+                    自動導航狀態:
+                  </span>
+                  <input
+                    type="text"
+                    aria-label="X"
+                    className="navigation-form-control ms-2"
+                    placeholder="目前導航狀態 "
+                    value={navigatgionStatusMsg}
+                  />
+                </div>
+              </div>
+              <div className="mt-2 ms-1 button-input-container">
+                <button
+                  type="button"
+                  className="btn btn-success my-button "
+                  onClick={() => {
+                    if (FirstConnect_check) {
+                      Car_Go_Home();
+                    }
+                  }}
+                >
+                  回到原點
+                </button>
+                {/* <input
                   type="text"
                   className="form-control ms-1"
                   placeholder="回到原點 (X, Y, Yaw) = (0,0,0)" //"Msg :"
                   value={go_home_msg}
                   readOnly
                 /> */}
-            <button
-              type="button"
-              className="btn btn-info my-button  ms-3"
-              onClick={() => {
-                if (FirstConnect_check) {
-                  Relocation_initpose();
-                }
-              }}
-            >
-              重新定位
-            </button>
-            <button
-              type="button"
-              className="btn btn-warning my-button  ms-3"
-              onClick={() => {
-                if (FirstConnect_check) {
-                  Car_control_mode();
-                }
-              }}
-            >
-              控制模式切換
-            </button>
-            {/* <input
+                <button
+                  type="button"
+                  className="btn btn-info my-button  ms-3"
+                  onClick={() => {
+                    if (FirstConnect_check) {
+                      Relocation_initpose();
+                    }
+                  }}
+                >
+                  重新定位
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-warning my-button  ms-3"
+                  onClick={() => {
+                    if (FirstConnect_check) {
+                      Car_control_mode();
+                    }
+                  }}
+                >
+                  控制模式切換
+                </button>
+                {/* <input
                   type="text"
                   className="form-control small-input ms-2"
                   placeholder="重新定位地圖在 (X, Y, Yaw) = (0,0,0)"
                   value={relocation_initpose_msg}
                   readOnly
                 /> */}
-          </div>
-          <div>
-            <button
-              type="button"
-              className="btn btn-outline-info btn-lg mt-2 ms-2"
-              onClick={() => {
-                // if (FirstConnect_check) {
-                addPoint();
-                // }
-              }}
-            >
-              新增停靠位置
-            </button>
-            {/* <span className="navigathon-statuss-style-font ms-2">
+              </div>
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-outline-info btn-lg mt-2 ms-2"
+                  onClick={() => {
+                    // if (FirstConnect_check) {
+                    addPoint();
+                    // }
+                  }}
+                >
+                  新增停靠位置
+                </button>
+                {/* <span className="navigathon-statuss-style-font ms-2">
                   {navigatgionStatusMsg}
                 </span> */}
-          </div>
-          <div className="position-container mt-1 ms-2">
-            <div className="input-group">
-              <input
-                type="text"
-                aria-label="X"
-                className="form-control"
-                placeholder="座位人員姓名"
-                value={Dispatch_Name}
-                readOnly
-              />
-              <input
-                type="text"
-                aria-label="X"
-                className="form-control"
-                placeholder="目標座標 X "
-                value={Dispatch_x}
-                onChange={(e) => setDispatch_x(e.target.value)}
-              />
-              <input
-                type="text"
-                aria-label="Y"
-                className="form-control"
-                placeholder="目標座標 Y "
-                value={Dispatch_y}
-                onChange={(e) => setDispatch_y(e.target.value)}
-              />
-              <input
-                type="text"
-                aria-label="Z"
-                className="form-control"
-                placeholder="目標座標 Yaw "
-                value={Dispatch_z}
-                onChange={(e) => setDispatch_z(e.target.value)}
-              />
-            </div>
-          </div>
+              </div>
+              <div className="position-container mt-1 ms-2">
+                <div className="input-group">
+                  <input
+                    type="text"
+                    aria-label="X"
+                    className="form-control"
+                    placeholder="座位人員姓名"
+                    value={Dispatch_Name}
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    aria-label="X"
+                    className="form-control"
+                    placeholder="目標座標 X "
+                    value={Dispatch_x}
+                    onChange={(e) => setDispatch_x(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    aria-label="Y"
+                    className="form-control"
+                    placeholder="目標座標 Y "
+                    value={Dispatch_y}
+                    onChange={(e) => setDispatch_y(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    aria-label="Z"
+                    className="form-control"
+                    placeholder="目標座標 Yaw "
+                    value={Dispatch_z}
+                    onChange={(e) => setDispatch_z(e.target.value)}
+                  />
+                </div>
+              </div>
 
-          <div className="tableContainerStyle mt-3">
-            <h3>
-              派車點位停靠列表:
-              <button
-                className="btn btn-outline-danger  ms-4"
-                onClick={() => {
-                  if (FirstConnect_check) {
-                    deleteSelectedPoint();
-                  }
-                }}
-              >
-                刪除點位
-              </button>
-              <button
-                className="btn btn-outline-danger  ms-2"
-                onClick={() => {
-                  if (FirstConnect_check) {
-                    clearPointList();
-                  }
-                }}
-              >
-                清空列表點位
-              </button>
-              {/* {selectedIndex != null && ( */}
-              <>
-                <button
-                  className="btn btn-outline-secondary ms-2"
-                  onClick={() => moveRow(selectedIndex, "up")}
-                  disabled={selectedIndex === 0} // 如果已經是第一個元素，禁用上移按鈕
-                >
-                  上移
-                </button>
-                <button
-                  className="btn btn-outline-secondary ms-2"
-                  onClick={() => moveRow(selectedIndex, "down")}
-                  disabled={selectedIndex === Savecarpoint.length - 1} // 如果已經是最後一個元素，禁用下移按鈕
-                >
-                  下移
-                </button>
-              </>
-              {/* )} */}
-            </h3>
-            <div className="tableStyle">
-              <table>
-                <thead>
-                  <tr>
-                    <th className="thTdStyle">Name :</th>
-                    <th className="thTdStyle">Site :</th>
-                    <th className="thTdStyle">X :</th>
-                    <th className="thTdStyle">Y :</th>
-                    <th className="thTdStyle">Yaw :</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Savecarpoint.map((point, index) => (
-                    <tr
-                      key={index}
-                      onClick={() => setSelectedIndex(index)}
-                      style={trStyle(index, selectedIndex)}
+              <div className="tableContainerStyle mt-3">
+                <h3>
+                  派車點位停靠列表:
+                  <button
+                    className="btn btn-outline-danger  ms-4"
+                    onClick={() => {
+                      if (FirstConnect_check) {
+                        deleteSelectedPoint();
+                      }
+                    }}
+                  >
+                    刪除點位
+                  </button>
+                  <button
+                    className="btn btn-outline-danger  ms-2"
+                    onClick={() => {
+                      if (FirstConnect_check) {
+                        clearPointList();
+                      }
+                    }}
+                  >
+                    清空列表點位
+                  </button>
+                  {/* {selectedIndex != null && ( */}
+                  <>
+                    <button
+                      className="btn btn-outline-secondary ms-2"
+                      onClick={() => moveRow(selectedIndex, "up")}
+                      disabled={selectedIndex === 0} // 如果已經是第一個元素，禁用上移按鈕
                     >
-                      <td className="thTdStyle">{point.name}</td>
-                      <td className="thTdStyle">{point.site}</td>
-                      <td className="thTdStyle">{point.x}</td>
-                      <td className="thTdStyle">{point.y}</td>
-                      <td className="thTdStyle">{point.yaw}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      上移
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary ms-2"
+                      onClick={() => moveRow(selectedIndex, "down")}
+                      disabled={selectedIndex === Savecarpoint.length - 1} // 如果已經是最後一個元素，禁用下移按鈕
+                    >
+                      下移
+                    </button>
+                  </>
+                  {/* )} */}
+                </h3>
+                <div className="tableStyle">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th className="thTdStyle">Name :</th>
+                        <th className="thTdStyle">Site :</th>
+                        <th className="thTdStyle">X :</th>
+                        <th className="thTdStyle">Y :</th>
+                        <th className="thTdStyle">Yaw :</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Savecarpoint.map((point, index) => (
+                        <tr
+                          key={index}
+                          onClick={() => setSelectedIndex(index)}
+                          style={trStyle(index, selectedIndex)}
+                        >
+                          <td className="thTdStyle">{point.name}</td>
+                          <td className="thTdStyle">{point.site}</td>
+                          <td className="thTdStyle">{point.x}</td>
+                          <td className="thTdStyle">{point.y}</td>
+                          <td className="thTdStyle">{point.yaw}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline-success btn-lg mt-3 ms-2"
+                onClick={() => {
+                  //確保連線上 且 車子 math 地圖
+                  if (FirstConnect_check) {
+                    Car_Set_Goal();
+                  }
+                }}
+              >
+                任務出發
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-lg mt-3 ms-2"
+                onClick={() => {
+                  if (FirstConnect_check) {
+                    Car_Path_Cancel();
+                  }
+                }}
+              >
+                任務取消並回原點
+              </button>
+              {/* <button
+                type="button"
+                className="btn btn-outline-danger btn-lg mt-3 ms-2"
+                onClick={() => {
+                  // if (FirstConnect_check) {
+                    AGV_problem_mail();
+                  // }
+                }}
+              >
+                郵件測試
+              </button> */}
+            </Tab>
+            <Tab eventKey="Car2Info" title="AGV2派遣頁面">
+              <Car_Interface_copy onMapData={handleAGV2Mapdata}/>
+            </Tab>
+            <Tab eventKey="GoalHistory" title="任務派遣紀錄">
+              <div className="search-container">
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-lg ms-2"
+                  onClick={() => {
+                    getCarList();
+                  }}
+                >
+                  取得歷史派車紀錄
+                </button>
+                <span className="search-style-font ms-4" />
+                選擇搜尋模式 :
+                <select
+                  className="input-text search-container-red ms-3"
+                  onChange={(e) => setSearchMode(e.target.value)}
+                  value={searchMode}
+                >
+                  <option value="Dispatch_Mode">派車模式</option>
+                  <option value="Time">時間模式</option>
+                </select>
+                <input
+                  className="search-container-input-text ms-2"
+                  type="text"
+                  placeholder={searchMode === "Dispatch_Mode" ? "輸入 `Car Dispatch` 或 `Path cancel`" : "yyyy/mm/dd hh:mm:ss"}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                ></input>
+              </div>
+              <div className="history-list">
+                {Fin_records_carpoint.map((history, index) => (
+                  <div key={index} className="history-entry">
+                    <div onClick={() => toggleExpand(index)}>
+                      <span className="state-style-color ">
+                        {history.status}
+                      </span>
+                      <span className="ms-3 state-style-font">
+                        {formatDate(history.time)}
+                      </span>
+                    </div>
+                    {isExpanded === index && (
+                      <div className="mt-3 ms-1 state-style-font ">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th className="state-thTdStyle">Site :</th>
+                              <th className="state-thTdStyle">X :</th>
+                              <th className="state-thTdStyle">Y :</th>
+                              <th className="state-thTdStyle">Yaw :</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {history.pointlist.map((point, index) => (
+                              <tr>
+                                <td className="state-thTdStyle">
+                                  {point.site}
+                                </td>
+                                <td className="state-thTdStyle">{point.x}</td>
+                                <td className="state-thTdStyle">{point.y}</td>
+                                <td className="state-thTdStyle">{point.yaw}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Tab>
+            <Tab eventKey="Chat" title="ChatGpt派車">
+              <ChatTab />
+            </Tab>
+          </Tabs>
+        </div>
+        <div className="map-container-wrapper">
+          <div className="map-frame">
+            <div className="map-title">田明大樓 8F 辦公室圖</div>
+            <div
+              className="map-container"
+              style={{ position: "relative", width: "100%", height: "100%" }}
+            >
+              <img
+                src={mapImage}
+                alt="Map"
+                style={{ width: "100%", height: "100%" }}
+              />
+              {/* 生成地圖上紅點 */}
+              {points.map((point) => (
+                <MapPoint
+                  name={point.name}
+                  key={point.id}
+                  id={point.id}
+                  x={point.x}
+                  y={point.y}
+                  yaw={point.yaw}
+                  mapX={point.mapX}
+                  mapY={point.mapY}
+                  onEnter={handleMouseEnter}
+                  onLeave={handleMouseLeave}
+                  onDown={handlePointClick}
+                />
+              ))}
+              <CarOnMap
+                mapX={`${mapX}%`}
+                mapY={`${mapY}%`}
+                yaw={mapyaw}
+              />
+               {/* AGV2 Car */}
+              {/* <CarOnMap 
+                mapX={`${map2X}%`}
+                mapY={`${map2Y}%`}
+                yaw={map2yaw}
+              /> */}
+              {hoverInfo.visible && (
+                <div className="tooltip-container visible">
+                  <p>Name:{hoverInfo.name}</p>
+                  <p>X: {hoverInfo.x}</p>
+                  <p>Y: {hoverInfo.y}</p>
+                  <p>Yaw: {hoverInfo.yaw}</p>
+                </div>
+              )}
             </div>
           </div>
-          <button
-            type="button"
-            className="btn btn-outline-success btn-lg mt-3 ms-2"
-            onClick={() => {
-              //確保連線上 且 車子 math 地圖
-              if (FirstConnect_check) {
-                Car_Set_Goal();
-              }
-            }}
-          >
-            任務出發
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline-danger btn-lg mt-3 ms-2"
-            onClick={() => {
-              if (FirstConnect_check) {
-                Car_Path_Cancel();
-              }
-            }}
-          >
-            任務取消
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-export default Car_Interface_2;
+export default Car_Interface;
