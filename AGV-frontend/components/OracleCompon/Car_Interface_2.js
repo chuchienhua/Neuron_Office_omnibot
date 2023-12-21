@@ -3,18 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { registerAllCellTypes } from "handsontable/cellTypes";
 import axios from "axios";
-import Tab from "react-bootstrap/Tab";
-import Tabs from "react-bootstrap/Tabs";
-import Utils from "../../Utils"
+import Utils from "../../Utils.js"
 import "./HomeOracle.css";
-import "./Car_Interface_copy.css";
-import MapPoint from "../Map/MapPoint.js";
-import CarOnMap from "../Map/CarOnMap.js";
+import "./Car_Interface_2.css";
 import initialPoints from "../Map/InitialPoints.js";
 import quaternionToYaw from "../TFconvert/quaternionToYaw.js";
 import { saveCarList, pathCar_cancel } from "../Goalhistory/GoalList.js";
 import { toast } from "react-toastify";
-function Car_Interface_2() {
+function Car_Interface_2({ onMapData }) {
+  const user = useSelector((state) => state.user);
   registerAllCellTypes();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -31,6 +28,7 @@ function Car_Interface_2() {
   const [isPolling, setIsPolling] = useState(false);
   const [carConnect, setCarConnect] = useState(false);
   const [carConnectMsg, setCarConnectMsg] = useState("");
+  const [start_navigation, setStart_navigation] = useState(false);
   const [navigatgionStatusMsg, setNavigatgionStatusMsg] = useState(
     "顯示自動導航目前狀態"
   );
@@ -59,52 +57,12 @@ function Car_Interface_2() {
   const [connect_heartbeat, setConnect_heartbeat] = useState(0);
   const map_match_parameter = 0.5;
   // const Carurl = "http://192.168.103.171:3000/";
-  const Carurl = "http://192.168.103.123:9090/";
-
-  const [points, setPoints] = useState(initialPoints);
-
-  const [hoverInfo, setHoverInfo] = useState({
-    visible: false,
-    name: "",
-    x: 0,
-    y: 0,
-    yaw: 0,
-  });
+  const Carurl = "http://192.168.8.241:3561/"; //TP_IOT
 
   const trStyle = (index, selectedIndex) => ({
     backgroundColor: selectedIndex === index ? "#f2f2f2" : "#fff",
     cursor: "pointer", // Add pointer on hover over the rows
   });
-
-  const getCarList = async () => {
-    setIsExpanded(null);
-    const apiurl = Utils.getURL("newmember/get_car_pointlist");
-    try {
-      const response = await axios.get(apiurl);
-      setRecords_carpoint(response.data);
-    } catch (error) {
-      console.error("Error fetching data: ", error);
-    }
-  };
-
-  //地圖上滑鼠進入紅點
-  const handleMouseEnter = (point) => {
-    setHoverInfo({ visible: true, name: point.name, x: point.x, y: point.y, yaw: point.yaw });
-  };
-
-  //地圖上滑鼠離開紅點
-  const handleMouseLeave = () => {
-    setHoverInfo({ visible: false, name: "", x: 0, y: 0, yaw: 0 });
-  };
-
-  //地圖上點擊紅點
-  const handlePointClick = (point) => {
-    setHoverInfo({ visible: true, x: point.x, y: point.y, yaw: point.yaw });
-    setDispatch_Name(point.name.toString());
-    setDispatch_x(point.x.toString());
-    setDispatch_y(point.y.toString());
-    setDispatch_z(point.yaw.toString());
-  };
 
   //增加點位
   const addPoint = () => {
@@ -164,6 +122,12 @@ function Car_Interface_2() {
     setCarConnect(!carConnect);
   };
 
+  useEffect(() => {
+    if (onMapData && typeof onMapData === 'function') {
+      onMapData(mapX, mapY, mapyaw);
+    }
+  }, [mapX, mapY, mapyaw, onMapData]);
+
   //建立連線
   useEffect(() => {
     let connectIntervalId;
@@ -172,7 +136,7 @@ function Car_Interface_2() {
     const connect = async () => {
       // 更新心跳计数器并立即使用新值
       setConnect_heartbeat(prev => {
-        const updatedHeartbeat = prev + 1;
+        const updatedHeartbeat = prev >= 50 ? 0 : prev + 1;
         sendHeartbeat(updatedHeartbeat); // 使用新值发送心跳
         return updatedHeartbeat;
       });
@@ -188,8 +152,9 @@ function Car_Interface_2() {
         });
         lastDataReceivedTime = Date.now(); // 成功接收數據時更新時間
         setCarConnectMsg(response.data.connect); // 更新状态
-        setNavigatgionStatusMsg(response.data.navigationStatus); // 更新状态
-        setControlmode(response.data.joystickStatus);
+        setStart_navigation(response.data.startnavigation_status)
+        // setNavigatgionStatusMsg(response.data.navigationStatus); // 更新状态
+        // setControlmode(response.data.joystickStatus);
         // console.log(response);
         if (JSON.stringify(response.status) === "200") {
           setFirstConnect_check(true);
@@ -203,6 +168,7 @@ function Car_Interface_2() {
       try {
         response = await axios.post(Carurl + "disconnect", { carid: 0x02, carconnect_bool: false });
         console.log(response.data.disconnect);
+        window.location.reload();
       } catch (error) {
         console.error("Could not fetch data", error);
       }
@@ -214,7 +180,7 @@ function Car_Interface_2() {
       connectIntervalId = setInterval(connect, 800); // 每 4000 毫秒調用一次
       // 檢查是否超過4.5秒未收到數據
       const checkDataTimeout = setInterval(() => {
-        if (Date.now() - lastDataReceivedTime > 3500 && !FirstConnect_check) {
+        if (Date.now() - lastDataReceivedTime > 2000 && !FirstConnect_check) {
           // 4秒超時
           setCarConnect(false); // 超時，將carConnect設為false
           setIsPolling(false);
@@ -269,6 +235,8 @@ function Car_Interface_2() {
               carid: 0x02,
             });
           const data = response.data;
+          setNavigatgionStatusMsg(data.navigationStatus); // 更新状态
+          setControlmode(data.joystickStatus);
           const newMapMatchRatio = data.map_match_ratio;
           // 防止car server端已斷線後，前端還在收取map_match_ratio的連續相同值
           if (newMapMatchRatio === lastMapMatchRatio) {
@@ -302,7 +270,7 @@ function Car_Interface_2() {
         }
       };
       fetchNumber(); // 使用並設置計時器
-      intervalId = setInterval(fetchNumber, 100); // 每 100 毫秒调用一次
+      intervalId = setInterval(fetchNumber, 800); // 每 100 毫秒调用一次
     }
     // 清除定时器
     return () => {
@@ -320,6 +288,18 @@ function Car_Interface_2() {
       setIs_map_match(true);
     }
   }, [map_match_ratio])
+
+  //確認導航中是否斷線
+  useEffect(() => {
+    console.log(start_navigation);
+    if (start_navigation) {
+      if (!carConnect) {
+        console.log("導航中斷線");
+        AGV_problem_mail();
+      }
+    }
+
+  }, [carConnect, start_navigation])
 
   //位置 TF 4元素轉換
   useEffect(() => {
@@ -373,7 +353,7 @@ function Car_Interface_2() {
     axios
       .post(Carurl + "control_mode", {
         carid: 0x02,
-        control_mode: car_mode, //ROS value setting Int8 40
+        control_mode: 42, //ROS value setting Int8 40
       })
       .then((res) => {
         set_go_home_msg(res.data);
@@ -418,10 +398,6 @@ function Car_Interface_2() {
   };
   //------------------
 
-  //-------------
-
-  //----------
-
   //車子派遣
   const Car_Set_Goal = () => {
     if (Is_map_match) {
@@ -456,6 +432,21 @@ function Car_Interface_2() {
         console.log(err);
       });
     pathCar_cancel();
+  };
+
+  //郵件測試
+  const AGV_problem_mail = () => {
+    axios
+      .post(Carurl + "AGVMail/sendmail", {
+        carid: 0x01,
+        user: user.PPS_CODE, //ROS value setting 34
+      })
+      .then((res) => {
+        console.log(res.status);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
   };
 
   const moveRow = (currentIndex, direction) => {
